@@ -18,14 +18,17 @@ def getCell(block):
     return list(map(formatify, cell_str.split("\n")))
 #
 
-def getSpeciesPositionsForces(block):
+def getSpeciesPositionsForces(block, dictOfSpecies):
     """
     species, positions, forces = getSpeciesPositionsForces(block)
     """
     position_pattern = re.compile("fz\n(.*?)\n Energy", re.S)
     matrix_str = position_pattern.findall(block)[0]
-    matrix_floats = np.array(list(map(formatify, matrix_str.split("\n"))))
-    species   = np.array(matrix_floats[:, 1].astype(np.int64))
+
+    matrix_strLines = matrix_str.split("\n")
+    species = [ dictOfSpecies[ line.split()[1] ] for line in matrix_strLines ]
+
+    matrix_floats = np.array(list(map(formatify, matrix_str.split("\n"))))    
     positions = matrix_floats[:, 2:5]
     forces    = matrix_floats[:, 5:8].tolist()
     
@@ -62,7 +65,7 @@ def getStress(block):
 #
 
 # inspired on ttps://github.com/materialsvirtuallab/maml/blob/master/maml/apps/pes/_mtp.py
-def read_cfgs(filename):
+def read_cfgs(filename, dictOfSpecies):
     """
     Args:
         filename (str): The configuration file to be read.
@@ -78,7 +81,7 @@ def read_cfgs(filename):
         d = {"outputs": {}}
         d["size"] = getSize(block)
         d["cell"] = getCell(block)
-        species, positions, forces = getSpeciesPositionsForces(block)
+        species, positions, forces = getSpeciesPositionsForces(block, dictOfSpecies)
         d["species"]   = species
         d["positions"] = positions
         assert d["size"] == len(species)
@@ -90,3 +93,11 @@ def read_cfgs(filename):
         data_pool.append(d)
     #
     return data_pool
+#
+
+def species2elements(species, dictionary):
+    elements = copy.deepcopy(species)
+    for (i, s) in enumerate(species):
+        elements[i] = dictionary[s]
+    #
+    return elements

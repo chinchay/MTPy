@@ -117,5 +117,14 @@ import importlib
 importlib.reload(cfg2ase)
 
 from cfg2ase import read_cfgs
-dict = read_cfgs("toRelax.cfg")
+dictOfSpecies = {"0":"C", "1":"O"}
+dict = read_cfgs("relaxed.cfg", dictOfSpecies)
+# %%
+from ase import Atom
+
+species = dict[1]['species']
+cell = dict[1]['cell']
+positions = dict[1]['positions']
+
+atoms = Atoms("".join(species), cell=cell, positions=positions)
 # %%
