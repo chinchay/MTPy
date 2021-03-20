@@ -1,5 +1,6 @@
 from ase import Atom
 import numpy as np
+import re
 
 def formatify(string):
     return [float(s) for s in string.split()]
@@ -23,10 +24,27 @@ def getSpeciesPositionsForces(block):
     """
     position_pattern = re.compile("fz\n(.*?)\n Energy", re.S)
     matrix_str = position_pattern.findall(block)[0]
-    matrix_floats = np.array(list(map(formatify, line_str.split("\n"))))
-    species   = np.array(self.elements)[line_floats[:, 1].astype(np.int64)]
-    positions = line_floats[:, 2:5]
-    forces    = line_floats[:, 5:8].tolist()
+    matrix_floats = np.array(list(map(formatify, matrix_str.split("\n"))))
+    species   = np.array(matrix_floats[:, 1].astype(np.int64))
+    positions = matrix_floats[:, 2:5]
+    forces    = matrix_floats[:, 5:8].tolist()
+    
+    # if len(position_pattern.findall(block)) > 0:
+        # matrix_str = position_pattern.findall(block)[0]
+        # matrix_floats = np.array(list(map(formatify, matrix_str.split("\n"))))
+        # species   = np.array(self.elements)[matrix_floats[:, 1].astype(np.int64)]
+        # positions = matrix_floats[:, 2:5]
+        # forces    = matrix_floats[:, 5:8].tolist()
+    # else:
+    #     position_pattern = re.compile("cartes_z\n(.*?)\nEND_CFG", re.S)
+    #     print(position_pattern.findall(block))
+    #     matrix_str = position_pattern.findall(block)[0]
+        
+    #     matrix_floats = np.array(list(map(formatify, line_str.split("\n"))))
+    #     species   = np.array(self.elements)[matrix_floats[:, 1].astype(np.int64)]
+    #     positions = matrix_floats[:, 2:5]
+    #     forces    = []
+    # #
     return species, positions, forces
 #
 
@@ -44,7 +62,7 @@ def getStress(block):
 #
 
 # inspired on ttps://github.com/materialsvirtuallab/maml/blob/master/maml/apps/pes/_mtp.py
-def read_cfgs(self, filename):
+def read_cfgs(filename):
     """
     Args:
         filename (str): The configuration file to be read.
@@ -65,9 +83,9 @@ def read_cfgs(self, filename):
         d["positions"] = positions
         assert d["size"] == len(species)
         #
-        d["outputs"]["energy"] = energy
+        d["outputs"]["energy"] = getEnergy(block)
         d["outputs"]["forces"] = forces
-        d["outputs"]["virial_stress"] = virial_stress
+        d["outputs"]["virial_stress"] = getStress(block)
         #
         data_pool.append(d)
     #

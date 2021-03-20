@@ -112,3 +112,10 @@ getCfgsWithRandAtom(atoms, atom, nCfgs=50, stdev=vacuum)
 
 
 # %%
+import cfg2ase
+import importlib
+importlib.reload(cfg2ase)
+
+from cfg2ase import read_cfgs
+dict = read_cfgs("toRelax.cfg")
+# %%
