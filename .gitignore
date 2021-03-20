@@ -1,5 +1,8 @@
 toRelax.cfg
 relaxed.cfg
+*.png
+*.in
+.DS_Store
 __pycache__
 .vscode
 .python-version

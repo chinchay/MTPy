@@ -120,11 +120,44 @@ from cfg2ase import read_cfgs
 dictOfSpecies = {"0":"C", "1":"O"}
 dict = read_cfgs("relaxed.cfg", dictOfSpecies)
 # %%
-from ase import Atom
+from ase import Atoms
+d = dict[0]
+species = d['species']
+cell = d['cell']
+positions = d['positions']
 
-species = dict[1]['species']
-cell = dict[1]['cell']
-positions = dict[1]['positions']
+atoms = Atoms("".join(species), cell=cell, positions=positions, pbc=(1,0,0))
+# %%
+import nglview as nv
+v = nv.show_ase(atoms)
+v.background = 'black'
+v
+# %%
+from ase.io.espresso import write_espresso_in
+QEin = "temporal.in"
+f = open(QEin, "w")
+write_espresso_in(fd=f, atoms=atoms, input_data=None, pseudopotentials=None, kspacing=None, kpts=None, koffset=(0, 0, 0), crystal_coordinates=False)
+f.close()
 
-atoms = Atoms("".join(species), cell=cell, positions=positions)
+# %%
+import matplotlib.pyplot as plt
+from ase.visualize.plot import plot_atoms
+fig, ax = plt.subplots()
+plot_atoms(atoms, ax, radii=0.3, rotation=('90x,0y,0z'))
+fig.savefig("ase_atoms.png")
+#%%
+
+# %%
+from ase import Atoms
+d = dict[0]
+species = d['species']
+cell = d['cell']
+positions = d['positions']
+atoms = Atoms("".join(species), cell=cell, positions=positions, pbc=(1,0,0))
+import matplotlib.pyplot as plt
+from ase.visualize.plot import plot_atoms
+fig, ax = plt.subplots()
+plot_atoms(atoms, ax, radii=0.3, rotation=('90x,0y,0z'))
+# fig.savefig("ase_atoms.png")
+
 # %%
