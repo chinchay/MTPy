@@ -33,7 +33,7 @@ def getCfgs(atoms, nCfgs, stdev):
         # cfgString += atoms2cfg(atoms)
         # atoms = copy.deepcopy(atoms_original)
     #
-    f = open("toRelax.cfg", "w")
+    f = open("to_relax.cfg", "w")
     f.write(cfgString)
     f.close()
 #
@@ -76,7 +76,7 @@ def getCfgsWithRandAtom(atoms, atom, nCfgs, stdev):
     #     atoms = copy.deepcopy(atoms_original)
     #     atom.position = pos_original
     # #
-    f = open("toRelax.cfg", "a")
+    f = open("to_relax.cfg", "a")
     f.write(cfgString)
     f.close()
 #   
