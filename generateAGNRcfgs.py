@@ -83,11 +83,22 @@ def getCfgsWithRandAtom(atoms, atom, nCfgs, stdev):
 #%%
 from ase.build import graphene_nanoribbon
 
-vacuum = 6.0
-atoms = graphene_nanoribbon(1, 1, type='armchair', saturated=False, C_H=1.1, C_C=1.4, vacuum=vacuum,  magnetic=True, initial_mag=1.12)
+vacuum = 9.0
+stdev  = 0.5
+nCfgs  = 50
 #
-getCfgs(atoms, nCfgs=50, stdev=1.0)
+atoms = graphene_nanoribbon(2, 1, type='armchair', saturated=False, C_H=1.1, C_C=1.4, vacuum=vacuum,  magnetic=True, initial_mag=1.12)
+getCfgs(atoms, nCfgs=nCfgs, stdev=stdev)
 
+#%%
+# Visualization
+from ase.build import graphene_nanoribbon
+atoms = graphene_nanoribbon(2, 3, type='armchair', saturated=True, C_H=1.1, C_C=1.4, vacuum=vacuum,  magnetic=True, initial_mag=1.12)
+import nglview as nv
+# nv.show_ase(atoms)
+v = nv.show_ase(atoms)
+v.background = 'black'
+v
 #%%
 # add oxygen at random positions over the unit cell space
 from ase import Atom
@@ -96,7 +107,7 @@ r = atoms.get_positions()
 rhalf = (r[1] + r[2]) / 2
 
 atom = Atom("O", position=rhalf )
-getCfgsWithRandAtom(atoms, atom, nCfgs=50, stdev=vacuum)
+getCfgsWithRandAtom(atoms, atom, nCfgs=nCfgs, stdev=vacuum)
 
 
 

@@ -3,6 +3,8 @@ import time
 import sys
 import subprocess
 from subprocess import Popen, PIPE
+import os.path
+from os import path
 # You need `cycles.py`,  `to_relax.cfg`, and `train.cfg` (create it by `touch train.cfg` if it's your first cycle)
 # You can run this code with:
 # salloc --time=10:00:00 --ntasks=1 --cpus-per-task=1 --mem-per-cpu=2G --account=def-rmelnik
@@ -76,6 +78,7 @@ def selectionStep():
               "mlp convert-cfg diff.cfg POSCAR --output-format=vasp-poscar"
     os.system(command)
     print("Finished Selection step")
+    checkTostop()
 #
 
 def shouldContinueSleeping():
@@ -133,7 +136,12 @@ def sendJobs(nJobs):
     # if "nothing to resubmit" continue
 #
 
-def dftStep(nJobs):
+def getNumberJobs2send(nPoscars):
+    # this is a temporary solution...
+    return (nPoscars // 6) + 1 # job_script.sh have 1 hour of wall time, and each sub-job takes ~10min to finish (for 9atoms)
+#
+
+def dftStep():
     command = "cd 5_afterActiveLearning  && rm -rf META/"
     os.system(command)
 
@@ -158,9 +166,12 @@ def dftStep(nJobs):
     f.close()
     #
     print("sending jobs now...")
+    assert nPoscars > 0
+    nJobs = getNumberJobs2send(nPoscars)
     sendJobs(nJobs)
     print("It seems I have finished jobs")
     print("Finished DFT step")
+    checkTostop()
 #
 
 def wait2SeeIfTrainGotStuck(lastLine0, lastLine, checkTrainTime=120):
@@ -243,6 +254,7 @@ def copyFromDFT2Training():
               "rm train2.cfg"
     os.system(command)
     print("files from dft to train ready")
+    checkTostop()
 #
 
 def trainingStep(checkTrainTime):
@@ -300,6 +312,7 @@ def trainingStep(checkTrainTime):
     os.system(command)
 
     print("Finished Training step")
+    checkTostop()
     #
     # return checkTrainTime
 #
@@ -314,14 +327,21 @@ def relaxStep():
     os.system(command)
 
     print("Finished Relaxation step")
+    checkTostop()
 #
 
+def checkTostop():
+    if path.exists("stop.txt"):
+        print("I found 'stop.txt', so I should stop...")
+        sys.exit()
+    #
+#
 
 # os.system("mlj")##??
 
 
 maxNcycles = 15
-nJobs = 1
+#nJobs = 1
 checkTrainTime = 15
 
 
@@ -349,7 +369,7 @@ continuar = True
 for i in range(maxNcycles):
     if continuar:
         selectionStep()
-        dftStep(nJobs)
+        dftStep()
         copyFromDFT2Training()
         trainingStep(checkTrainTime) # <<== updates checkTrainTime
         relaxStep()
