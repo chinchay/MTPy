@@ -46,15 +46,7 @@ def initialize():
     command = "cd 2_myTraining/  && " +\
               "cp /home/chinchay/projects/def-rmelnik/chinchay/mydocs/paper1/agnr/1/2_myTraining/pot_blank_binary.mtp .  && " +\
               "cp pot_blank_binary.mtp pot.mtp  && " +\
-              "cp ../train.cfg .  && " +\
-              "mlp calc-grade pot.mtp train.cfg train.cfg temp1.cfg"
-    os.system(command)
-
-    command = "cd 4_toRelax/  && " +\
-              "cp ../2_myTraining/pot.mtp .  && " +\
-              "cp ../2_myTraining/state.mvs .  && " +\
-              "mlp relax relax.ini --cfg-filename=to_relax.cfg --min-dist=0.5  && " +\
-              "cat selected.cfg_*  > selected.cfg"
+              "cp ../train.cfg ."
     os.system(command)
 #
 
@@ -236,7 +228,7 @@ def trainingStep(checkTrainTime):
                 checkTrainTime *= 2 # <<== perhaps we need to wait more to check variations in `training.txt`
                 print("isTrainingOK got False, checkTrainTime = ", checkTrainTime)
             #
-            print("trying number " + str(i))
+            print("trying number " + str(i + 1))
         #
     #
     #
@@ -267,14 +259,22 @@ def trainingStep(checkTrainTime):
     
     command = "mv Trained.mtp_  2_myTraining/pot.mtp" # <<-- mtp was run in an outside directory, so this corrects the location file
     os.system(command)
+    #
+    print("Finished Training step")
+    return checkTrainTime
+#
     
+def calcGradeStep():
+    command = "cd 2_myTraining/  && " +\
+              "rm -f errorsByPythonPopen.txt temp1.cfg training.txt state.mvs selected.cfg"
+    os.system(command)
+
     command = "cd 2_myTraining/  && " +\
               "mlp calc-grade pot.mtp train.cfg train.cfg temp1.cfg"
     os.system(command)
 
-    print("Finished Training step")
+    print("Finished calcGrade step")
     #
-    return checkTrainTime
 #
 
 def relaxStep():
@@ -292,20 +292,25 @@ def relaxStep():
 
 # os.system("mlj")##??
 
-#initialize()
+nJobs          = 1       # when sending dft jobs to queue `submit.run nJobs`
+maxNcycles     = 15      # max number of cycles calcGrade, relax, selection, dft, Train
+checkTrainTime = 5       # check every 5 seconds for `training.txt`
 #
-maxNcycles = 1
-nJobs = 1
-checkTrainTime = 120
+initialize()
 continuar = True
-
 for i in range(maxNcycles):
     if continuar:
-        #selectionStep()
-        #dftStep(nJobs)
-        checkTrainTime = trainingStep(checkTrainTime) # <<== updates checkTrainTime
+        calcGradeStep()
         relaxStep()
         continuar = shouldContinue()
+        #
+        if continuar:
+            selectionStep()
+            dftStep(nJobs)
+            checkTrainTime = trainingStep(checkTrainTime) # <<== updates checkTrainTime
+        else:
+            print("count selected.cfg got 0, so continuar=False. Stopping program...")
+        #
         print("end of loop i = " + str(i) )
 #     #
 print("finish loop")
