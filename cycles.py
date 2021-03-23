@@ -3,7 +3,10 @@ import time
 import sys
 import subprocess
 from subprocess import Popen, PIPE
-# You need `cycles.py` and `to_relax.cfg`
+# You need `cycles.py`,  `to_relax.cfg`, and `train.cfg` (create it by `touch train.cfg` if it's your first cycle)
+# You can run this code with:
+# salloc --time=10:00:00 --ntasks=1 --cpus-per-task=1 --mem-per-cpu=2G --account=def-rmelnik
+# python cycles.py | tee mylog.txt
 
 def getCountCfgs():
     command = ' grep "BEGIN_CFG" 4_toRelax/selected.cfg | wc -l '
@@ -43,7 +46,7 @@ def initialize():
     command = "cd 2_myTraining/  && " +\
               "cp /home/chinchay/projects/def-rmelnik/chinchay/mydocs/paper1/agnr/1/2_myTraining/pot_blank_binary.mtp .  && " +\
               "cp pot_blank_binary.mtp pot.mtp  && " +\
-              "touch train.cfg  && " +\
+              "cp ../train.cfg .  && " +\
               "mlp calc-grade pot.mtp train.cfg train.cfg temp1.cfg"
     os.system(command)
 
@@ -56,11 +59,17 @@ def initialize():
 #
 
 def selectionStep():
+    # clean from previous selection step:
+    command = "cd 2_myTraining/  && " +\
+              "rm -f diff.cfg POSCAR*"
+    os.system(command)
+
     command = "cd 2_myTraining/  && " +\
               "cp ../4_toRelax/selected.cfg .  && " +\
               "mlp select-add pot.mtp train.cfg selected.cfg diff.cfg  && " +\
               "mlp convert-cfg diff.cfg POSCAR --output-format=vasp-poscar"
     os.system(command)
+    print("Finished Selection step")
 #
 
 def shouldContinueSleeping():
@@ -145,11 +154,12 @@ def dftStep(nJobs):
     print("sending jobs now...")
     sendJobs(nJobs)
     print("It seems I have finished jobs")
+    print("Finished DFT step")
 #
 
 def wait2SeeIfTrainGotStuck(lastLine0, lastLine, checkTrainTime=120):
     endTrainingLine = "_______________________________________________"   
-    command = "tail -2 training.txt"
+    command = "tail -2 2_myTraining/training.txt"
     # First, check if trainig has finished, so it is already unstuck.
     if endTrainingLine == os.popen(command).read().split()[0]:
         return False 
@@ -164,8 +174,9 @@ def isTrainingUnstuck(myprocess, checkTrainTime):
     isUnstuck = True
     lastLine0 = ""
     # `myprocess.poll()` will check if subprocess is finished. If not, it will return `None`
+    time.sleep(checkTrainTime)
     while (myprocess.poll() is None) and isUnstuck: # BOTH options MUST be true
-        lastLine  = os.popen("tail -1 training.txt").read().split()[0]
+        lastLine  = os.popen("tail -1 2_myTraining/training.txt").read().split()[0]
         isUnstuck = wait2SeeIfTrainGotStuck(lastLine0, lastLine, checkTrainTime)
         lastLine0 = lastLine
     #
@@ -173,13 +184,14 @@ def isTrainingUnstuck(myprocess, checkTrainTime):
 #
 
 def hasTrainingFinishedAndUnstuck(checkTrainTime):
-    f = open("training.txt", "w")
-    g = open("errorsByPythonPopen.txt", "w")
-    p = Popen(["cd", "2_myTraining/", "&&", "mlp", "train", "pot.mtp", "train.cfg"], stdout=f, stderr=g)
+    f = open("2_myTraining/training.txt", "w")
+    g = open("2_myTraining/errorsByPythonPopen.txt", "w")
+    p = Popen(["mlp", "train", "2_myTraining/pot.mtp", "2_myTraining/train.cfg"], stdout=f, stderr=g)
     #
     unStuck = isTrainingUnstuck(p, checkTrainTime) # <<== don't worry, it sleeps until finding Trainig has finished, or it got stuck
     if not unStuck:  # it got stuck, so It couldn't finish calculations
         p.kill()
+        print("I had to kill the training process because it got stuck")
     #
     f.close()
     g.close()
@@ -187,13 +199,18 @@ def hasTrainingFinishedAndUnstuck(checkTrainTime):
 #
 
 def checkErrorFile():
-    g = open("errorsByPythonPopen.txt", "r")
+    g = open("2_myTraining/errorsByPythonPopen.txt", "r")
     checkLine = g.readline().split(" \n")[0]
     g.close()
     return checkLine
 #
 
 def trainingStep(checkTrainTime):
+    # clean from previous training step:
+    command = "cd 2_myTraining/  && " +\
+              "rm -f errorsByPythonPopen.txt temp1.cfg training.txt state.mvs selected.cfg"
+    os.system(command)
+
     command = "cd 5_afterActiveLearning/META/  && " +\
               "python scriptQE2cfg.py  && " +\
               "cd ../../2_myTraining/  && " +\
@@ -202,38 +219,62 @@ def trainingStep(checkTrainTime):
               "cat train2.cfg >> train.cfg  && " +\
               "rm train2.cfg"
     os.system(command)
+    print("mlp train ...")
     #
+    errorBFGSaccending = "ERROR: BFGS: stepping in accend direction detected."
     isTrainingOK = False
-    for _ in range(2):        
+    for i in range(5):        
         if not isTrainingOK:
             if hasTrainingFinishedAndUnstuck(checkTrainTime):
+                print("hasTrainingFinishedAndUnstuck() got true, checking if isTrainingOK = True")
                 # mlp exited, and produced a `training.txt`. However we need to check if there was a BGFS ascending error:
                 isTrainingOK = ( checkErrorFile() != errorBFGSaccending )
+                print("isTrainingOK got True")
             else:
                 # mlp got stuck, runs infinitely. `training.txt` has stuck in the same line
                 isTrainingOK = False
+                checkTrainTime *= 2 # <<== perhaps we need to wait more to check variations in `training.txt`
+                print("isTrainingOK got False, checkTrainTime = ", checkTrainTime)
             #
+            print("trying number " + str(i))
         #
     #
+    #
     if not isTrainingOK:
+        print("trying another trick...")
         # let's try another trick:
         # if the same error appear again, take a fresh pot.mtp:
-        command = "cp pot_blank_binary.mtp pot.mtp"
+        command = "cp 2_myTraining/pot_blank_binary.mtp 2_myTraining/pot.mtp"
         os.system(command)
         if hasTrainingFinishedAndUnstuck(checkTrainTime):
             if checkErrorFile() == errorBFGSaccending:
                 #? You should increase configs in 4_toRelax/to_reala.cfg, and start all again
                 print("error errorBFGSaccending again?")
-                print("You should increase configs in 4_toRelax/to_reala.cfg, and start all again")
+                print("You should increase configs in 4_toRelax/to_relax.cfg, and start all again")
                 print("I am going to stop here... :/")
                 sys.exit()
             #
+        else:
+            print("Training keeps getting stuck")
+            print("You should increase configs in 4_toRelax/to_relax.cfg, and start all again")
+            print("I am going to stop here... :/")
+            sys.exit()
         #
     #
     #
-    command = "cd 2_myTraining/  &&  mv Trained.mtp_ pot.mtp  && " +\
+    # command = "cd 2_myTraining/  &&  mv Trained.mtp_ pot.mtp  && " +\
+    #           "mlp calc-grade pot.mtp train.cfg train.cfg temp1.cfg"
+    
+    command = "mv Trained.mtp_  2_myTraining/pot.mtp" # <<-- mtp was run in an outside directory, so this corrects the location file
+    os.system(command)
+    
+    command = "cd 2_myTraining/  && " +\
               "mlp calc-grade pot.mtp train.cfg train.cfg temp1.cfg"
     os.system(command)
+
+    print("Finished Training step")
+    #
+    return checkTrainTime
 #
 
 def relaxStep():
@@ -244,6 +285,8 @@ def relaxStep():
               "mlp relax relax.ini --cfg-filename=to_relax.cfg --min-dist=0.5  && " +\
               "cat selected.cfg_*  > selected.cfg"
     os.system(command)
+
+    print("Finished Relaxation step")
 #
 
 
@@ -260,7 +303,7 @@ for i in range(maxNcycles):
     if continuar:
         #selectionStep()
         #dftStep(nJobs)
-        trainingStep(checkTrainTime)
+        checkTrainTime = trainingStep(checkTrainTime) # <<== updates checkTrainTime
         relaxStep()
         continuar = shouldContinue()
         print("end of loop i = " + str(i) )
