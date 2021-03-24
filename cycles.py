@@ -8,7 +8,8 @@ from os import path
 # You need `cycles.py`,  `to_relax.cfg`, and `train.cfg` (create it by `touch train.cfg` if it's your first cycle)
 # You can run this code with:
 # salloc --time=10:00:00 --ntasks=1 --cpus-per-task=1 --mem-per-cpu=2G --account=def-rmelnik
-# python cycles.py | tee mylog.txt
+# module --force purge && module load StdEnv/2016.4 && module load nixpkgs/16.09 intel/2019.3 intelmpi/2019.3.199 && module load python/3.6.3 && source /home/chinchay/projects/def-rmelnik/chinchay/mydocs/venvs/jupyter_py3/bin/activate
+# python -u cycles.py | tee mylog.txt ##(to save screen messages into mylog.txt)
 
 def getCountCfgs():
     command = ' grep "BEGIN_CFG" 4_toRelax/selected.cfg | wc -l '
@@ -253,6 +254,13 @@ def copyFromDFT2Training():
               "cat train2.cfg >> train.cfg  && " +\
               "rm train2.cfg"
     os.system(command)
+
+    command = "cat 5_afterActiveLearning/META/scf_*  >> qeins.txt"
+    os.system(command)
+
+    command = "cat 5_afterActiveLearning/META/RUN*/scf_*  >> qeouts.txt"
+    os.system(command)
+
     print("files from dft to train ready")
     checkTostop()
 #

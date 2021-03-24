@@ -19,12 +19,20 @@ def perturbAllPositions(positions, amplitud):
     return positions
 #
 
-def getCfgs(atoms, nCfgs, stdev):
+def getCfgs(atoms, mindist, nCfgs, stdev):
     atoms_original = copy.deepcopy(atoms)
     cfgString = ""
-    for i in range(nCfgs):
+    countCfgs = 0
+    for i in range(1000): # try 1000 times, until reaching the desired number of configurations `nCfgs`
         atoms.rattle(stdev, seed=i) # see rattle() in https://wiki.fysik.dtu.dk/ase/ase/atoms.html
-        cfgString += atoms2cfg(atoms) 
+        if getMinDist(atoms) > mindist: # disregard those structures with atoms too close
+            cfgString += atoms2cfg(atoms) 
+            countCfgs += 1
+            if countCfgs == nCfgs:
+                atoms = copy.deepcopy(atoms_original)
+                break
+            #
+        #
         atoms = copy.deepcopy(atoms_original)
         #
         # the following lines does not get random values for x, y, z 
@@ -33,6 +41,7 @@ def getCfgs(atoms, nCfgs, stdev):
         # cfgString += atoms2cfg(atoms)
         # atoms = copy.deepcopy(atoms_original)
     #
+    print("I generated " + str(countCfgs) + " cfgs.")
     f = open("to_relax.cfg", "w")
     f.write(cfgString)
     f.close()
@@ -58,37 +67,71 @@ def _rattleAtom(atom, stdev=0.001, seed=None, rng=None):
     atom.position = pos + rng.normal(scale=stdev, size=3)
 #
 
-def getCfgsWithRandAtom(atoms, atom, nCfgs, stdev):
+def getCfgsWithRandAtom(atoms, atom, mindist, nCfgs, stdev):
     atoms_original = copy.deepcopy(atoms)
     pos_original   = copy.deepcopy(atom.position)
     cfgString = ""
-    for i in range(nCfgs):
+    countCfgs = 0
+    for i in range(1000): # try 1000 times, until reaching the desired number of configurations `nCfgs`
         _rattleAtom(atom, stdev, seed=i)
         atoms.append(atom)
-        cfgString += atoms2cfg(atoms) 
+        if getMinDist(atoms) > mindist: # disregard those structures with atoms too close
+            cfgString += atoms2cfg(atoms) 
+            countCfgs += 1
+            if countCfgs == nCfgs:
+                atoms = copy.deepcopy(atoms_original)
+                atom.position = copy.deepcopy(pos_original)
+                break
+            #
+        #
         atoms = copy.deepcopy(atoms_original)
         atom.position = copy.deepcopy(pos_original)
-
-
+    #
     #     atom.position = perturbPosition(atom.position, amplitud)
     #     atoms.append(atom)
     #     cfgString += atoms2cfg(atoms)
     #     atoms = copy.deepcopy(atoms_original)
     #     atom.position = pos_original
     # #
+    print("I generated " + str(countCfgs) + " cfgs.")
     f = open("to_relax.cfg", "a")
     f.write(cfgString)
     f.close()
-#   
+#
+
+def getMinDist(atoms):
+    distMatrix = atoms.get_all_distances()
+    distances = [e for e in distMatrix.flatten() if e != 0.0]
+    mindist1 = np.amin(distances)
+    #
+    distMatrix = atoms.get_all_distances(mic=True)
+    distances = [e for e in distMatrix.flatten() if e != 0.0]
+    mindist2 = np.amin(distances)
+    #
+    return min(mindist1, mindist2)
+#
+
 #%%
 from ase.build import graphene_nanoribbon
 
+mindist = 0.5
 vacuum = 9.0
 stdev  = 0.5
 nCfgs  = 50
 #
 atoms = graphene_nanoribbon(2, 1, type='armchair', saturated=False, C_H=1.1, C_C=1.4, vacuum=vacuum,  magnetic=True, initial_mag=1.12)
-getCfgs(atoms, nCfgs=nCfgs, stdev=stdev)
+getCfgs(atoms, mindist=mindist, nCfgs=nCfgs, stdev=stdev)
+
+#%%
+# add oxygen at random positions over the unit cell space
+from ase import Atom
+
+r = atoms.get_positions()
+rhalf = (r[1] + r[2]) / 2
+
+atom = Atom("O", position=rhalf )
+getCfgsWithRandAtom(atoms, atom, mindist=mindist, nCfgs=nCfgs, stdev=vacuum)
+
 
 #%%
 # Visualization
@@ -99,16 +142,6 @@ import nglview as nv
 v = nv.show_ase(atoms)
 v.background = 'black'
 v
-#%%
-# add oxygen at random positions over the unit cell space
-from ase import Atom
-
-r = atoms.get_positions()
-rhalf = (r[1] + r[2]) / 2
-
-atom = Atom("O", position=rhalf )
-getCfgsWithRandAtom(atoms, atom, nCfgs=nCfgs, stdev=vacuum)
-
 
 
 # print(atoms.get_positions())
