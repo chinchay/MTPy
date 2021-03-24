@@ -5,7 +5,7 @@ import subprocess
 from subprocess import Popen, PIPE
 import os.path
 from os import path
-# You need `cycles.py`,  `to_relax.cfg`, and `train.cfg` (create it by `touch train.cfg` if it's your first cycle)
+# You need `cycles.py`,  `to_relax.cfg`, `jobtrain.sh`, `train.cfg` (create it by `touch train.cfg` if it's your first cycle)
 # You can run this code with:
 # salloc --time=10:00:00 --ntasks=1 --cpus-per-task=1 --mem-per-cpu=2G --account=def-rmelnik
 # module --force purge && module load StdEnv/2016.4 && module load nixpkgs/16.09 intel/2019.3 intelmpi/2019.3.199 && module load python/3.6.3 && source /home/chinchay/projects/def-rmelnik/chinchay/mydocs/venvs/jupyter_py3/bin/activate
@@ -63,7 +63,8 @@ def initialize():
     command = "cd 2_myTraining/  && " +\
               "cp /home/chinchay/projects/def-rmelnik/chinchay/mydocs/paper1/agnr/1/2_myTraining/pot_blank_binary.mtp .  && " +\
               "cp pot_blank_binary.mtp pot.mtp  && " +\
-              "cp ../train.cfg ."
+              "cp ../train.cfg .  && " +\
+              "cp ../jobtrain.sh ."
     os.system(command)
 #
 
@@ -175,9 +176,32 @@ def dftStep():
     checkTostop()
 #
 
-def wait2SeeIfTrainGotStuck(lastLine0, lastLine, checkTrainTime=120):
-    endTrainingLine = "_______________________________________________"  
-    
+def wait2SeeIfTrainGotStuck(lastLine0, lastLine, checkTrainTime=120):    
+    # command = 'squeue -u chinchay | grep "jobtrain.sh" | grep "PD" | wc -l'
+    # count = 0
+    # while (int(os.popen(command).read().split()[0]) == 1):
+    #     print("training.txt does not exist. mlp train job is still in queue")
+    #     time.sleep(180) # I tried squeue every 60 seconds, but I had this error: `slurm_load_jobs error: Socket timed out on send/recv operation`
+    #     count += 1
+    #     # if it has been sleeping for 1 hour:
+    #     if count > 20:
+    #         sys.exit()
+    #     #
+    # #
+
+    count = 0
+    while not path.exists("2_myTraining/training.txt"):
+        print("2_myTraining/training.txt does not exist. mlp train job is still in queue or it has not been sent!")
+        time.sleep(60)
+        count += 1
+        # if it has been sleeping for 1 hour:
+        if count > 60:
+            sys.exit()
+        #
+    #
+
+
+    endTrainingLine = "_______________________________________________"
     command = "tail -2 2_myTraining/training.txt"
     checkLine = os.popen(command).read().split()[0]
 
@@ -200,6 +224,23 @@ def wait2SeeIfTrainGotStuck(lastLine0, lastLine, checkTrainTime=120):
     return (lastLine0 != lastLine)
 #
 
+def isTrainingJobUnstuck(checkTrainTime):
+    # https://stackoverflow.com/questions/12057794/python-using-popen-poll-on-background-process
+    isUnstuck = True
+    lastLine0 = ""
+    time.sleep(checkTrainTime)
+    while isUnstuck:
+        lastLine  = os.popen("tail -1 2_myTraining/training.txt").read().split("\n")[0]
+        print("comparing lines.......")
+        print(lastLine0)
+        print(lastLine)
+        print("......................")
+        isUnstuck = wait2SeeIfTrainGotStuck(lastLine0, lastLine, checkTrainTime)
+        lastLine0 = lastLine
+    #
+    return isUnstuck 
+#
+
 def isTrainingUnstuck(myprocess, checkTrainTime):
     # https://stackoverflow.com/questions/12057794/python-using-popen-poll-on-background-process
     isUnstuck = True
@@ -219,17 +260,26 @@ def isTrainingUnstuck(myprocess, checkTrainTime):
 #
 
 def hasTrainingFinishedAndUnstuck(checkTrainTime):
-    f = open("2_myTraining/training.txt", "w")
-    g = open("2_myTraining/errorsByPythonPopen.txt", "w")
-    p = Popen(["mlp", "train", "2_myTraining/pot.mtp", "2_myTraining/train.cfg"], stdout=f, stderr=g)
+    command = "wc -l 2_myTraining/train.cfg"
+    nLines = int(os.popen(command).read().split()[0])
+
+    if nLines > 3000:
+        command = "cd 2_myTraining/  && " +\
+                  "sbatch jobtrain.sh"
+        os.system(command)
+        unStuck = isTrainingJobUnstuck(checkTrainTime) # <<== don't worry, it sleeps until finding Trainig has finished, or it got stuck
+    else:
+        f = open("2_myTraining/training.txt", "w")
+        g = open("2_myTraining/errorsByPythonPopen.txt", "w")
+        p = Popen(["mlp", "train", "2_myTraining/pot.mtp", "2_myTraining/train.cfg"], stdout=f, stderr=g)
+        unStuck = isTrainingUnstuck(p, checkTrainTime) # <<== don't worry, it sleeps until finding Trainig has finished, or it got stuck
+        if not unStuck:  # it got stuck, so It couldn't finish calculations
+            p.kill()
+            print("I had to kill the training process because it got stuck")
+        #
+        f.close()
+        g.close()
     #
-    unStuck = isTrainingUnstuck(p, checkTrainTime) # <<== don't worry, it sleeps until finding Trainig has finished, or it got stuck
-    if not unStuck:  # it got stuck, so It couldn't finish calculations
-        p.kill()
-        print("I had to kill the training process because it got stuck")
-    #
-    f.close()
-    g.close()
     return unStuck
 #
 
