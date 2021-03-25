@@ -432,6 +432,42 @@ def shouldContinue(fileName):
     return ( countCfgsFile(fileName) != 0 )
 #
 
+## Test later the interface below. Needs improvement, and initialization!
+# from itertools import cycle
+# def mtprun(selection, maxNcycles, checkTrainTime):
+#     steps = ["selectionStep()", "dftStep()", "copyFromDFT2Training()", "trainingStep(checkTrainTime)", "updateTrainedPotential()", "calcGrade()", "relaxStep()"]
+#     pool  = cycle(steps)
+
+#     l = range(len(steps))
+#     pool  = cycle(l)
+#     for _ in range(selection - 1):
+#         s = next(pool)
+#     #
+
+#     continuar = True
+#     for i in range(maxNcycles):
+#         funStr = steps[next(pool)]
+#         if continuar:
+#             while funStr != "relaxStep()":
+#                 print( "step: " + funStr )
+#                 eval(funStr)
+#                 funStr = steps[next(pool)]
+#             #
+#             eval(funStr) # = "relaxStep()"
+#             continuar = shouldContinue("4_toRelax/selected.cfg")
+#             print("end of loop i = ", i )
+#         #
+#     #
+#     print("finish loop")
+# #
+# selection = 1
+# maxNcycles = 2
+# checkTrainTime = 15
+# mtprun(selection, maxNcycles, checkTrainTime)
+
+
+
+
 
 maxNcycles = 15
 #nJobs = 1
