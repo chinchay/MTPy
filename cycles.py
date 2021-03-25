@@ -11,20 +11,155 @@ from os import path
 # module --force purge && module load StdEnv/2016.4 && module load nixpkgs/16.09 intel/2019.3 intelmpi/2019.3.199 && module load python/3.6.3 && source /home/chinchay/projects/def-rmelnik/chinchay/mydocs/venvs/jupyter_py3/bin/activate
 # python -u cycles.py | tee mylog.txt ##(to save screen messages into mylog.txt)
 
-def getCountCfgs():
-    command = ' grep "BEGIN_CFG" 4_toRelax/selected.cfg | wc -l '
-    if int(os.popen(command).read().split()[0]) >= 1:
+####################################################################
+def sleepWhileTrainJobIsPD():
+    count = 0
+    while not path.exists("2_myTraining/training.txt"):
+        print("2_myTraining/training.txt does not exist. mlp train job is still in queue or it has not been sent!")
+        time.sleep(60)
+        count += 1
+        # if it has been sleeping for 1 hour:
+        if count > 60:
+            sys.exit()
+        #
+    #
+#
+
+def getTrainJobId():
+    command = 'squeue -u chinchay | grep "jobtrain.sh"'
+    jobId = ''
+    count = 0
+    while (jobId == '') and (count < 20):
+        try:
+            line = os.popen(command).read()
+            if line == '':
+                jobId = 'nojobfound'
+            else:
+                jobId = line.split()[0]
+            #
+        except:
+            print("something went wrong when asking slurm for jobId..., I will try again")
+            sleep(60)
+            count += 1
+        #
+    #
+    if count >= 20:
+        print("error while asking slurm for jobId, stopping...")
+        sys.exit()
+    #
+    return jobId
+#
+
+def sleepWhileDFTJobsRunning():
+    command = 'squeue -u chinchay | grep "META" | wc -l'
+    nSqueue = -1
+    count = 0
+    while (nSqueue == -1) and (count < 20):
+        try:
+            nSqueue = int(os.popen(command).read().split()[0])
+        except:
+            print("something went wrong when asking slurm for DFT jobs..., I will try again")
+            sleep(30)
+            count += 1
+        #
+    #
+    if count >= 20:
+        print("error while asking slurm for DFT jobs, stopping...")
+        sys.exit()
+    #
+    if nSqueue >= 1:
         return True
     #
     return False
 #
 
-def shouldContinue():
-    if getCountCfgs() == 0:
-        return False
-    #
-    return True
+def trainingFinished():
+    endTrainingLine = "_______________________________________________"
+    command = "tail -2 2_myTraining/training.txt"
+    checkLine = os.popen(command).read().split()[0]
+    return ( endTrainingLine == checkLine )
 #
+
+def getLastLineTraining():
+    return os.popen("tail -1 2_myTraining/training.txt").read().split("\n")[0]
+#
+
+def isTrainingStuck(checkTrainTime=15, process=None):    
+    prevLine = getLastLineTraining()
+    time.sleep(checkTrainTime)
+    nextLine = getLastLineTraining()
+    print("prevLine...........: " + prevLine)
+    print("nextLine...........: " + nextLine)
+    print("")
+    return (prevLine == nextLine)
+#
+
+def hasBFGSascendingError():
+    g = open("2_myTraining/errorsByPythonPopen.txt", "r")
+    checkLine = g.readline().split(" \n")[0]
+    g.close()
+    #
+    errorBFGSaccending = "ERROR: BFGS: stepping in accend direction detected."
+    return ( checkErrorFile() == errorBFGSaccending )
+#
+
+def killTrainJob():
+    jobID = getTrainJobId()
+    if jobID != 'nojobfound': # there is no training job!
+        command = "scancel " + jobID
+        os.system(command)
+    #
+#
+
+def train(checkTrainTime):
+    command = "wc -l 2_myTraining/train.cfg"
+    nLines = int(os.popen(command).read().split()[0])
+
+    if nLines > 3000:
+        command = "cd 2_myTraining/  && " +\
+                  "sbatch jobtrain.sh"
+        os.system(command)
+
+        sleepWhileTrainJobIsPD()
+        # Now TrainJob is running
+
+        time.sleep(checkTrainTime) # <<== let training start
+        while not trainingFinished():
+            isStuck = isTrainingStuck(checkTrainTime)
+            if isStuck:
+                killTrainJob()
+                return isStuck, None
+            #
+        #
+        # Training has finished, and isStuck=False
+        return isStuck, False  # returns: isStuck, hasBFGSascendingError()
+        # ********** I SHOULD IMPROVE THE PREVIOUS LINE CODE *****
+        # ********** IT SHOULD BE return isStuck,  hasBFGSascendingError(), but I have not implemente  hasBFGSascendingError() for slurm job sendin :/ only for process in the next part 
+        #
+    else:
+        f = open("2_myTraining/training.txt", "w")
+        g = open("2_myTraining/errorsByPythonPopen.txt", "w")
+        p = Popen(["mlp", "train", "2_myTraining/pot.mtp", "2_myTraining/train.cfg"], stdout=f, stderr=g)
+
+        time.sleep(checkTrainTime) # <<== let training start
+        while not trainingFinished():
+            isStuck = isTrainingStuck(checkTrainTime, p)
+            if isStuck:
+                p.kill()
+                print("I had to kill the training process because it is stuck")
+                f.close()
+                g.close()                
+                return isStuck, None
+            #
+        #
+        # Training has finished, and isStuck=False
+        f.close()
+        g.close()
+        # Training has finished, and isStuck=False
+        return isStuck, hasBFGSascendingError()  # returns: isStuck, hasBFGSascendingError()
+    #
+#
+####################################################################
 
 def initialize():
     os.system("mkdir 2_myTraining/")
@@ -83,15 +218,6 @@ def selectionStep():
     checkTostop()
 #
 
-def shouldContinueSleeping():
-    command = 'squeue -u chinchay | grep "META" | wc -l'
-    nSqueue = int(os.popen(command).read().split()[0])
-    if nSqueue >= 1:
-        return True
-    #
-    return False
-#
-
 def sendJobs(nJobs):
     command = "cd 5_afterActiveLearning/META/  && " +\
               "submit.run " + str(nJobs)
@@ -100,7 +226,8 @@ def sendJobs(nJobs):
     continueSleeping = True
     while continueSleeping:
         time.sleep(120)
-        continueSleeping = shouldContinueSleeping()
+        # continueSleeping = shouldContinueSleeping()
+        continueSleeping = sleepWhileDFTJobsRunning()
     #
     ###
     command = "cd 5_afterActiveLearning/META/  && " +\
@@ -111,7 +238,8 @@ def sendJobs(nJobs):
         continueSleeping = True
         while continueSleeping:
             time.sleep(120)
-            continueSleeping = shouldContinueSleeping()
+            # continueSleeping = shouldContinueSleeping()
+            continueSleeping = sleepWhileDFTJobsRunning()
         #    
     ######
 
@@ -176,120 +304,6 @@ def dftStep():
     checkTostop()
 #
 
-def wait2SeeIfTrainGotStuck(lastLine0, lastLine, checkTrainTime=120):    
-    # command = 'squeue -u chinchay | grep "jobtrain.sh" | grep "PD" | wc -l'
-    # count = 0
-    # while (int(os.popen(command).read().split()[0]) == 1):
-    #     print("training.txt does not exist. mlp train job is still in queue")
-    #     time.sleep(180) # I tried squeue every 60 seconds, but I had this error: `slurm_load_jobs error: Socket timed out on send/recv operation`
-    #     count += 1
-    #     # if it has been sleeping for 1 hour:
-    #     if count > 20:
-    #         sys.exit()
-    #     #
-    # #
-
-    count = 0
-    while not path.exists("2_myTraining/training.txt"):
-        print("2_myTraining/training.txt does not exist. mlp train job is still in queue or it has not been sent!")
-        time.sleep(60)
-        count += 1
-        # if it has been sleeping for 1 hour:
-        if count > 60:
-            sys.exit()
-        #
-    #
-
-
-    endTrainingLine = "_______________________________________________"
-    command = "tail -2 2_myTraining/training.txt"
-    checkLine = os.popen(command).read().split()[0]
-
-    # First, check if trainig has finished, so it is already unstuck.
-    if endTrainingLine == checkLine:
-        return False 
-    #
-
-    # sleep
-    time.sleep(checkTrainTime)
-
-    # check if the last line is `MTPR` 
-    endTrainingLine = "MTPR parallel training started"
-    command = "tail -1 2_myTraining/training.txt"
-    checkLine = os.popen(command).read().split("\n")[0]
-    if endTrainingLine == checkLine:
-        return False
-    #
-
-    return (lastLine0 != lastLine)
-#
-
-def isTrainingJobUnstuck(checkTrainTime):
-    # https://stackoverflow.com/questions/12057794/python-using-popen-poll-on-background-process
-    isUnstuck = True
-    lastLine0 = ""
-    time.sleep(checkTrainTime)
-    while isUnstuck:
-        lastLine  = os.popen("tail -1 2_myTraining/training.txt").read().split("\n")[0]
-        print("comparing lines.......")
-        print(lastLine0)
-        print(lastLine)
-        print("......................")
-        isUnstuck = wait2SeeIfTrainGotStuck(lastLine0, lastLine, checkTrainTime)
-        lastLine0 = lastLine
-    #
-    return isUnstuck 
-#
-
-def isTrainingUnstuck(myprocess, checkTrainTime):
-    # https://stackoverflow.com/questions/12057794/python-using-popen-poll-on-background-process
-    isUnstuck = True
-    lastLine0 = ""
-    # `myprocess.poll()` will check if subprocess is finished. If not, it will return `None`
-    time.sleep(checkTrainTime)
-    while (myprocess.poll() is None) and isUnstuck: # BOTH options MUST be true
-        lastLine  = os.popen("tail -1 2_myTraining/training.txt").read().split("\n")[0]
-        print("comparing lines.......")
-        print(lastLine0)
-        print(lastLine)
-        print("......................")
-        isUnstuck = wait2SeeIfTrainGotStuck(lastLine0, lastLine, checkTrainTime)
-        lastLine0 = lastLine
-    #
-    return isUnstuck 
-#
-
-def hasTrainingFinishedAndUnstuck(checkTrainTime):
-    command = "wc -l 2_myTraining/train.cfg"
-    nLines = int(os.popen(command).read().split()[0])
-
-    if nLines > 3000:
-        command = "cd 2_myTraining/  && " +\
-                  "sbatch jobtrain.sh"
-        os.system(command)
-        unStuck = isTrainingJobUnstuck(checkTrainTime) # <<== don't worry, it sleeps until finding Trainig has finished, or it got stuck
-    else:
-        f = open("2_myTraining/training.txt", "w")
-        g = open("2_myTraining/errorsByPythonPopen.txt", "w")
-        p = Popen(["mlp", "train", "2_myTraining/pot.mtp", "2_myTraining/train.cfg"], stdout=f, stderr=g)
-        unStuck = isTrainingUnstuck(p, checkTrainTime) # <<== don't worry, it sleeps until finding Trainig has finished, or it got stuck
-        if not unStuck:  # it got stuck, so It couldn't finish calculations
-            p.kill()
-            print("I had to kill the training process because it got stuck")
-        #
-        f.close()
-        g.close()
-    #
-    return unStuck
-#
-
-def checkErrorFile():
-    g = open("2_myTraining/errorsByPythonPopen.txt", "r")
-    checkLine = g.readline().split(" \n")[0]
-    g.close()
-    return checkLine
-#
-
 def copyFromDFT2Training():
     # clean from previous training step:
     command = "cd 2_myTraining/  && " +\
@@ -318,24 +332,24 @@ def copyFromDFT2Training():
 def trainingStep(checkTrainTime):
     print("mlp train ...")
     #
-    errorBFGSaccending = "ERROR: BFGS: stepping in accend direction detected."
+    # errorBFGSaccending = "ERROR: BFGS: stepping in accend direction detected."
     isTrainingOK = False
     for i in range(5):        
         if not isTrainingOK:
-            if hasTrainingFinishedAndUnstuck(checkTrainTime):
-                print("hasTrainingFinishedAndUnstuck() got true, checking if isTrainingOK = True")
-                # mlp exited, and produced a `training.txt`. However we need to check if there was a BGFS ascending error:
-                isTrainingOK = ( checkErrorFile() != errorBFGSaccending )
-                print("BGFS ascending error: isTrainingOK got: ", isTrainingOK)
-            else:
+            gotStuck, BFGSaccendingError = train(checkTrainTime)
+            if gotStuck:
                 # mlp got stuck, runs infinitely. `training.txt` has stuck in the same line
                 isTrainingOK = False
-                # checkTrainTime *= 2 # <<== perhaps we need to wait more to check variations in `training.txt`
-                print("isTrainingOK got False, checkTrainTime = ", checkTrainTime)
+                print("Training got stuck")
             #
-            print("trying number " + str(i))
+            elif BFGSaccendingError:
+                isTrainingOK = False
+                print("There is a BGFS ascending error :/")
+            else:
+                isTrainingOK = True
+                print("it seems there are no errors?...")
+            #
         #
-    #
     #
     if not isTrainingOK:
         print("trying another trick...")
@@ -343,14 +357,14 @@ def trainingStep(checkTrainTime):
         # if the same error appear again, take a fresh pot.mtp:
         command = "cp 2_myTraining/pot_blank_binary.mtp 2_myTraining/pot.mtp"
         os.system(command)
-        if hasTrainingFinishedAndUnstuck(checkTrainTime):
-            if checkErrorFile() == errorBFGSaccending:
+        gotStuck, BFGSaccendingError = train(checkTrainTime)
+        if not gotStuck:
+            if BFGSaccendingError:
                 #? You should increase configs in 4_toRelax/to_reala.cfg, and start all again
                 print("error errorBFGSaccending again?")
                 print("You should increase configs in 4_toRelax/to_relax.cfg, and start all again")
                 print("I am going to stop here... :/")
                 sys.exit()
-            #
         else:
             print("Training keeps getting stuck")
             print("You should increase configs in 4_toRelax/to_relax.cfg, and start all again")
@@ -359,20 +373,32 @@ def trainingStep(checkTrainTime):
         #
     #
     #
-    # command = "cd 2_myTraining/  &&  mv Trained.mtp_ pot.mtp  && " +\
-    #           "mlp calc-grade pot.mtp train.cfg train.cfg temp1.cfg"
-    
-    command = "mv Trained.mtp_  2_myTraining/pot.mtp" # <<-- mtp was run in an outside directory, so this corrects the location file
+    print("Finished Training step")
+    checkTostop()
+#
+
+def updateTrainedPotential():
+    if path.exists("Trained.mtp_"):
+        command = "mv Trained.mtp_  2_myTraining/pot.mtp" # <<-- mtp was run in an outside directory, so this corrects the location file
+    elif path.exists("2_myTraining/Trained.mtp_"):
+        command = "mv 2_myTraining/Trained.mtp_  2_myTraining/pot.mtp"
+    else:
+        print("I cannot find Trained.mtp_ , stopping...")
+        sys.exit()
+    #
     os.system(command)
-    
+    #
+    print("Finished updating trained potential")
+    checkTostop()
+#
+
+def calcGrade():
     command = "cd 2_myTraining/  && " +\
               "mlp calc-grade pot.mtp train.cfg train.cfg temp1.cfg"
     os.system(command)
-
-    print("Finished Training step")
-    checkTostop()
     #
-    # return checkTrainTime
+    print("Finished calc-grade")
+    checkTostop()
 #
 
 def relaxStep():
@@ -397,6 +423,15 @@ def checkTostop():
 
 # os.system("mlj")##??
 
+def countCfgsFile(fileName):
+    command = 'grep "BEGIN_CFG" ' + fileName + ' | wc -l'
+    return int(os.popen(command).read().split()[0])
+#
+
+def shouldContinue(fileName):
+    return ( countCfgsFile(fileName) != 0 )
+#
+
 
 maxNcycles = 15
 #nJobs = 1
@@ -404,23 +439,14 @@ checkTrainTime = 15
 
 
 initialize()
-command = ' grep "BEGIN_CFG" 2_myTraining/train.cfg | wc -l '
-nCfgsTrain = int(os.popen(command).read().split()[0])
+nCfgsTrain = countCfgsFile("2_myTraining/train.cfg")
 print("nCfgsTrain = ", nCfgsTrain)
-if nCfgsTrain == 0:
-    command = "cd 2_myTraining/  &&  mlp calc-grade pot.mtp train.cfg train.cfg temp1.cfg"
-    os.system(command)
-
-    command = "cd 4_toRelax/  && " +\
-            "cp ../2_myTraining/pot.mtp .  && " +\
-            "cp ../2_myTraining/state.mvs .  && " +\
-            "mlp relax relax.ini --cfg-filename=to_relax.cfg --min-dist=0.5  && " +\
-            "cat selected.cfg_*  > selected.cfg"
-    os.system(command)
-else:
-    trainingStep(checkTrainTime) # <<== updates checkTrainTime
-    relaxStep()
+if nCfgsTrain != 0:
+    trainingStep(checkTrainTime)
+    updateTrainedPotential()
 #
+calcGrade()
+relaxStep()
 print("finished initialization2")
 #
 continuar = True
@@ -429,11 +455,12 @@ for i in range(maxNcycles):
         selectionStep()
         dftStep()
         copyFromDFT2Training()
-        trainingStep(checkTrainTime) # <<== updates checkTrainTime
+        trainingStep(checkTrainTime)
+        updateTrainedPotential()
+        calcGrade()
         relaxStep()
-        continuar = shouldContinue()
+        continuar = shouldContinue("4_toRelax/selected.cfg")
         print("end of loop i = " + str(i) )
 #     #
 print("finish loop")
 # #
-
