@@ -139,7 +139,7 @@ def train(checkTrainTime):
     else:
         f = open("2_myTraining/training.txt", "w")
         g = open("2_myTraining/errorsByPythonPopen.txt", "w")
-        p = Popen(["mlp", "train", "2_myTraining/pot.mtp", "2_myTraining/train.cfg"], stdout=f, stderr=g)
+        p = Popen(["srun", "mlp", "train", "2_myTraining/pot.mtp", "2_myTraining/train.cfg"], stdout=f, stderr=g)
 
         time.sleep(checkTrainTime) # <<== let training start
         while not trainingFinished():
@@ -211,8 +211,8 @@ def selectionStep():
 
     command = "cd 2_myTraining/  && " +\
               "cp ../4_toRelax/selected.cfg .  && " +\
-              "mlp select-add pot.mtp train.cfg selected.cfg diff.cfg  && " +\
-              "mlp convert-cfg diff.cfg POSCAR --output-format=vasp-poscar"
+              "srun mlp select-add pot.mtp train.cfg selected.cfg diff.cfg  && " +\
+              "srun mlp convert-cfg diff.cfg POSCAR --output-format=vasp-poscar"
     os.system(command)
     print("Finished Selection step")
     checkTostop()
@@ -394,7 +394,7 @@ def updateTrainedPotential():
 
 def calcGrade():
     command = "cd 2_myTraining/  && " +\
-              "mlp calc-grade pot.mtp train.cfg train.cfg temp1.cfg"
+              "srun mlp calc-grade pot.mtp train.cfg train.cfg temp1.cfg"
     os.system(command)
     #
     print("Finished calc-grade")
@@ -406,7 +406,7 @@ def relaxStep():
               "rm -f select*  && " +\
               "cp ../2_myTraining/pot.mtp .  && " +\
               "cp ../2_myTraining/state.mvs .  && " +\
-              "mlp relax relax.ini --cfg-filename=to_relax.cfg --min-dist=0.5  && " +\
+              "srun mlp relax relax.ini --cfg-filename=to_relax.cfg --min-dist=0.5  && " +\
               "cat selected.cfg_*  > selected.cfg"
     os.system(command)
 
