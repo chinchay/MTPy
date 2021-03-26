@@ -19,21 +19,20 @@ def perturbAllPositions(positions, amplitud):
     return positions
 #
 
-def getCfgs(atoms, mindist, nCfgs, stdev):
-    atoms_original = copy.deepcopy(atoms)
+def getCfgs_rattleAll(atoms, mindist, nCfgs, stdev):
+    ats = copy.deepcopy(atoms)
     cfgString = ""
     countCfgs = 0
     for i in range(1000): # try 1000 times, until reaching the desired number of configurations `nCfgs`
-        atoms.rattle(stdev, seed=i) # see rattle() in https://wiki.fysik.dtu.dk/ase/ase/atoms.html
-        if getMinDist(atoms) > mindist: # disregard those structures with atoms too close
-            cfgString += atoms2cfg(atoms) 
+        ats.rattle(stdev, seed=i) # see rattle() in https://wiki.fysik.dtu.dk/ase/ase/atoms.html
+        if getMinDist(ats) > mindist: # disregard those structures with atoms too close
+            cfgString += atoms2cfg(ats) 
             countCfgs += 1
             if countCfgs == nCfgs:
-                atoms = copy.deepcopy(atoms_original)
                 break
             #
         #
-        atoms = copy.deepcopy(atoms_original)
+        ats = copy.deepcopy(atoms)
         #
         # the following lines does not get random values for x, y, z 
         # newPositions = perturbAllPositions(atoms.get_positions(), amplitud)
@@ -111,6 +110,36 @@ def getMinDist(atoms):
     return min(mindist1, mindist2)
 #
 
+def getCfgs_alatSweep(atoms, mindist, nCfgs):
+    a, b, c, _, _, _ = atoms.cell.cellpar()
+    positions = atoms.get_positions()
+    cfgString = ""
+    countCfgs = 0
+    for l in np.arange (-0.5, 1.5, 0.1): # C_Cdistance = 1.4, so 1.4-0.5 > 0
+        # increase the unit cell along Z-axis
+        atoms.set_cell([a, b, c + l])
+        
+        # center z-positions in the unit cell:
+        atoms.set_positions(positions)
+        atoms.translate([0, 0, l / 2])
+
+        if getMinDist(atoms) > mindist: # disregard those structures with atoms too close
+            cfgString += atoms2cfg(atoms)
+            countCfgs += 1
+            if countCfgs == nCfgs:
+                atoms = copy.deepcopy(atoms_original)
+                break
+            #
+        #
+    #
+    atoms.set_cell([a, b, c])
+    #
+    print("I generated " + str(countCfgs) + " cfgs.")
+    f = open("to_relax.cfg", "a")
+    f.write(cfgString)
+    f.close()
+#
+
 #%%
 from ase.build import graphene_nanoribbon
 
@@ -118,32 +147,40 @@ mindist = 0.5
 vacuum = 9.0
 stdev  = 0.5
 nCfgs  = 50
+cc_dist = 1.4
 #
-atoms = graphene_nanoribbon(2, 1, type='armchair', saturated=False, C_H=1.1, C_C=1.4, vacuum=vacuum,  magnetic=True, initial_mag=1.12)
-getCfgs(atoms, mindist=mindist, nCfgs=nCfgs, stdev=stdev)
+atoms = graphene_nanoribbon(3/2, 1, type='armchair', saturated=True, C_H=1.1, C_C=cc_dist, vacuum=vacuum,  magnetic=True, initial_mag=1.12)
+# center z-positions in the unit cell:
+atoms.translate([0, 0, cc_dist / 2])
+
+
+getCfgs_rattleAll(atoms, mindist=mindist, nCfgs=nCfgs, stdev=stdev)
+getCfgs_alatSweep(atoms, mindist, nCfgs)
+
 
 #%%
 # add oxygen at random positions over the unit cell space
 from ase import Atom
 
-r = atoms.get_positions()
-rhalf = (r[1] + r[2]) / 2
+# r = atoms.get_positions()
+# rhalf = (r[1] + r[2]) / 2
 
-atom = Atom("O", position=rhalf )
+# atom = Atom("O", position=rhalf )
+atom = Atom("O")
 getCfgsWithRandAtom(atoms, atom, mindist=mindist, nCfgs=nCfgs, stdev=vacuum)
 
 
 #%%
 # Visualization
+vacuum = 9.0
 from ase.build import graphene_nanoribbon
-atoms = graphene_nanoribbon(2, 3, type='armchair', saturated=True, C_H=1.1, C_C=1.4, vacuum=vacuum,  magnetic=True, initial_mag=1.12)
+atoms = graphene_nanoribbon(3/2, 1, type='armchair', saturated=True, C_H=1.1, C_C=1.4, vacuum=vacuum,  magnetic=True, initial_mag=1.12)
 import nglview as nv
 # nv.show_ase(atoms)
 v = nv.show_ase(atoms)
 v.background = 'black'
 v
-
-
+#%%
 # print(atoms.get_positions())
 # print("")
 # newPositions = perturbAllPositions(atoms.get_positions(), 1.0)
