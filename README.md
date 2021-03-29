@@ -1,2 +1,2 @@
-# mtpscripts
-A set of scripts to deal with MTP code
+# MTPy
+Performs the required steps for building an interatomic MTP aiming to minimize user intervention.
