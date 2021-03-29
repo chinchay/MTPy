@@ -5,7 +5,7 @@ import subprocess
 from subprocess import Popen, PIPE
 import os.path
 from os import path
-# You need `cycles.py`,  `to_relax.cfg`, `jobtrain.sh`, `train.cfg` (create it by `touch train.cfg` if it's your first cycle)
+# You need `pot_blank_ternary.mtp`, `cycles.py`,  `to_relax.cfg`, `jobtrain.sh`, `train.cfg` (create it by `touch train.cfg` if it's your first cycle)
 # You can run this code with:
 # salloc --time=10:00:00 --ntasks=1 --cpus-per-task=1 --mem-per-cpu=2G --account=def-rmelnik
 # module --force purge && module load StdEnv/2016.4 && module load nixpkgs/16.09 intel/2019.3 intelmpi/2019.3.199 && module load python/3.6.3 && source /home/chinchay/projects/def-rmelnik/chinchay/mydocs/venvs/jupyter_py3/bin/activate
@@ -92,6 +92,13 @@ def isTrainingStuck(checkTrainTime=15, process=None):
     print("nextLine...........: " + nextLine)
     print("")
     return (prevLine == nextLine)
+#
+
+def checkErrorFile():
+    g = open("2_myTraining/errorsByPythonPopen.txt", "r")
+    checkLine = g.readline().split(" \n")[0]
+    g.close()
+    return checkLine
 #
 
 def hasBFGSascendingError():
@@ -196,8 +203,8 @@ def initialize():
     # os.system(command)
 
     command = "cd 2_myTraining/  && " +\
-              "cp /home/chinchay/projects/def-rmelnik/chinchay/mydocs/paper1/agnr/1/2_myTraining/pot_blank_binary.mtp .  && " +\
-              "cp pot_blank_binary.mtp pot.mtp  && " +\
+              "cp ../pot_blank_ternary.mtp .  && " +\
+              "cp pot_blank_ternary.mtp pot.mtp  && " +\
               "cp ../train.cfg .  && " +\
               "cp ../jobtrain.sh ."
     os.system(command)
@@ -355,7 +362,7 @@ def trainingStep(checkTrainTime):
         print("trying another trick...")
         # let's try another trick:
         # if the same error appear again, take a fresh pot.mtp:
-        command = "cp 2_myTraining/pot_blank_binary.mtp 2_myTraining/pot.mtp"
+        command = "cp 2_myTraining/pot_blank_ternary.mtp 2_myTraining/pot.mtp"
         os.system(command)
         gotStuck, BFGSaccendingError = train(checkTrainTime)
         if not gotStuck:
@@ -379,15 +386,23 @@ def trainingStep(checkTrainTime):
 
 def updateTrainedPotential():
     if path.exists("Trained.mtp_"):
-        command = "mv Trained.mtp_  2_myTraining/pot.mtp" # <<-- mtp was run in an outside directory, so this corrects the location file
+        os.system("ls >> mylog.txt")
+        os.system("mv Trained.mtp_  2_myTraining/pot.mtp")# <<-- mtp was run in an outside directory, so this corrects the location file
+        os.system("echo ''")
+        os.system("ls >> mylog.txt")
     elif path.exists("2_myTraining/Trained.mtp_"):
-        command = "mv 2_myTraining/Trained.mtp_  2_myTraining/pot.mtp"
+        os.system("ls 2_myTraining/  >> mylog.txt")
+        os.system("mv 2_myTraining/Trained.mtp_  2_myTraining/pot.mtp")
+        os.system("echo ''")
+        os.system("ls 2_myTraining/  >> mylog.txt")
     else:
         print("I cannot find Trained.mtp_ , stopping...")
         sys.exit()
     #
+
+    command = "cat 2_myTraining/training.txt >> 2_myTraining/alltrainings.txt"
     os.system(command)
-    #
+
     print("Finished updating trained potential")
     checkTostop()
 #
@@ -471,7 +486,7 @@ def shouldContinue(fileName):
 
 maxNcycles = 15
 #nJobs = 1
-checkTrainTime = 15
+checkTrainTime = 30
 
 
 initialize()
