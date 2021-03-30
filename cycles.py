@@ -119,6 +119,11 @@ def killTrainJob():
 #
 
 def train(checkTrainTime):
+    # clean in case you are coming here from a previous stuck train: there will be a training.txt!
+    command = "cd 2_myTraining/  && " +\
+              "rm -f errorsByPythonPopen.txt temp1.cfg training.txt state.mvs selected.cfg"
+    os.system(command)
+
     command = "wc -l 2_myTraining/train.cfg"
     nLines = int(os.popen(command).read().split()[0])
 
@@ -127,7 +132,7 @@ def train(checkTrainTime):
                   "sbatch jobtrain.sh"
         os.system(command)
 
-        sleepWhileTrainJobIsPD()
+        sleepWhileTrainJobIsPD() # <<== here it waits while training.txt is not found!
         # Now TrainJob is running
 
         time.sleep(checkTrainTime) # <<== let training start
