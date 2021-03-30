@@ -511,23 +511,23 @@ maxNcycles = 15
 #nJobs = 1
 checkTrainTime = 30
 
-
-existsPrevious = initialize()
-if existsPrevious:
-    print("I am going to relax because I found previous trained potential ")
-    relaxStep()
-    print("finished initialization using previous potential")
-else:
-    nCfgsTrain = countCfgsFile("2_myTraining/train.cfg")
-    print("nCfgsTrain = ", nCfgsTrain)
-    if nCfgsTrain != 0:
-        trainingStep(checkTrainTime)
-        updateTrainedPotential()
+if not path.exists("notinit.txt"):
+    existsPrevious = initialize()
+    if existsPrevious:
+        print("I am going to relax because I found previous trained potential ")
+        relaxStep()
+        print("finished initialization using previous potential")
+    else:
+        nCfgsTrain = countCfgsFile("2_myTraining/train.cfg")
+        print("nCfgsTrain = ", nCfgsTrain)
+        if nCfgsTrain != 0:
+            trainingStep(checkTrainTime)
+            updateTrainedPotential()
+        #
+        calcGrade()
+        relaxStep()
+        print("finished initialization2")
     #
-    calcGrade()
-    relaxStep()
-    print("finished initialization2")
-#
 #
 continuar = True
 for i in range(maxNcycles):
