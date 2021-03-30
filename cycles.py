@@ -202,12 +202,30 @@ def initialize():
     #           "cat selected.cfg_*  > selected.cfg"
     # os.system(command)
 
-    command = "cd 2_myTraining/  && " +\
-              "cp ../pot_blank_ternary.mtp .  && " +\
-              "cp pot_blank_ternary.mtp pot.mtp  && " +\
-              "cp ../train.cfg .  && " +\
-              "cp ../jobtrain.sh ."
-    os.system(command)
+    existsPrevious = False
+    if path.exists("previousPot.mtp"):
+        print("previousPot.mtp found")
+        os.system("cp previousPot.mtp 2_myTraining/pot.mtp")
+
+        if path.exists("previousState.mvs") and path.exists("previousTrain.cfg"):
+            print("previousState.mvs and previousTrain.cfg found")
+            os.system("cp previousState.mvs 2_myTraining/state.mvs")
+            os.system("cp previousTrain.cfg 2_myTraining/train.cfg")
+            existsPrevious = True
+        #
+        else:
+            print("previousState.mvs or previousTrain.cfg not found, introduce it in workingDirectory")
+            sys.exit()
+        #
+    else:
+        os.system("cp pot_blank_ternary.mtp 2_myTraining/pot_blank_ternary.mtp")
+        os.system("cp 2_myTraining/pot_blank_ternary.mtp 2_myTraining/pot.mtp")
+        os.system("cp train.cfg 2_myTraining/train.cfg")
+    #
+
+    os.system("cp jobtrain.sh 2_myTraining/jobtrain.sh")
+    #
+    return existsPrevious
 #
 
 def selectionStep():
@@ -489,16 +507,22 @@ maxNcycles = 15
 checkTrainTime = 30
 
 
-initialize()
-nCfgsTrain = countCfgsFile("2_myTraining/train.cfg")
-print("nCfgsTrain = ", nCfgsTrain)
-if nCfgsTrain != 0:
-    trainingStep(checkTrainTime)
-    updateTrainedPotential()
+existsPrevious = initialize()
+if existsPrevious:
+    print("I am going to relax because I found previous trained potential ")
+    relaxStep()
+    print("finished initialization using previous potential")
+else:
+    nCfgsTrain = countCfgsFile("2_myTraining/train.cfg")
+    print("nCfgsTrain = ", nCfgsTrain)
+    if nCfgsTrain != 0:
+        trainingStep(checkTrainTime)
+        updateTrainedPotential()
+    #
+    calcGrade()
+    relaxStep()
+    print("finished initialization2")
 #
-calcGrade()
-relaxStep()
-print("finished initialization2")
 #
 continuar = True
 for i in range(maxNcycles):
