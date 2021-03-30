@@ -314,11 +314,21 @@ def dftStep():
     command = "ls 5_afterActiveLearning/META/POSCAR* | wc -l"
     nPoscars = int(os.popen(command).read().split()[0])
 
+    if nPoscars == 0:
+        print("something is wrong, nPoscars=0 ?? stopping now")
+        sys.exit()
+    #
+
     os.system("rm -f 5_afterActiveLearning/META/table.dat")
     f = open("5_afterActiveLearning/META/table.dat", "a")
     for i in range(nPoscars):
-        command = "cd 5_afterActiveLearning/META/  &&  python vasp2qe.py -i \"POSCAR" + str(i) + "\""
-        os.system(command)
+        if nPoscars != 1:
+            command = "cd 5_afterActiveLearning/META/  &&  python vasp2qe.py -i \"POSCAR" + str(i) + "\""
+            os.system(command)
+        else:
+            command = "cd 5_afterActiveLearning/META/  &&  python vasp2qe.py -i \"POSCAR" + "\""
+            os.system(command)
+        #
         
         line = "srun pw.x < ../scf_" + str(i + 1) + ".in > scf_" + str(i + 1) + ".out\n"
         f.write(line)
