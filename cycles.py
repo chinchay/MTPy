@@ -318,17 +318,17 @@ def dftStep():
         print("something is wrong, nPoscars=0 ?? stopping now")
         sys.exit()
     #
+    if nPoscars == 1:
+        # vasp2qe.py needs a number in the filename
+        command = "cd 5_afterActiveLearning/META/  &&  mv POSCAR POSCAR0"
+        os.system(command)
+    #
 
     os.system("rm -f 5_afterActiveLearning/META/table.dat")
     f = open("5_afterActiveLearning/META/table.dat", "a")
     for i in range(nPoscars):
-        if nPoscars != 1:
-            command = "cd 5_afterActiveLearning/META/  &&  python vasp2qe.py -i \"POSCAR" + str(i) + "\""
-            os.system(command)
-        else:
-            command = "cd 5_afterActiveLearning/META/  &&  python vasp2qe.py -i \"POSCAR" + "\""
-            os.system(command)
-        #
+        command = "cd 5_afterActiveLearning/META/  &&  python vasp2qe.py -i \"POSCAR" + str(i) + "\""
+        os.system(command)
         
         line = "srun pw.x < ../scf_" + str(i + 1) + ".in > scf_" + str(i + 1) + ".out\n"
         f.write(line)

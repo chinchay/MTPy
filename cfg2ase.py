@@ -101,3 +101,56 @@ def species2elements(species, dictionary):
         elements[i] = dictionary[s]
     #
     return elements
+#
+
+def getSpeciesPositions(block, dictOfSpecies):
+    """
+    species, positions = getSpeciesPositions(block)
+    """
+
+    position_pattern1 = re.compile("cartes_z\n(.*?)\n Feature", re.S)
+    position_pattern2 = re.compile("cartes_z\n(.*?)(?=$)", re.S) #  `$` means end of string
+
+    vec1 = position_pattern1.findall(block)
+    vec2 = position_pattern2.findall(block)
+
+    vec = vec1 if len(vec1) > 0 else vec2
+
+    matrix_str = vec[0]
+
+    matrix_strLines = matrix_str.split("\n")
+    species = [ dictOfSpecies[ line.split()[1] ] for line in matrix_strLines ]
+
+    matrix_floats = np.array(list(map(formatify, matrix_str.split("\n"))))    
+    positions = matrix_floats[:, 2:5]
+
+    return species, positions
+#
+
+
+# inspired on ttps://github.com/materialsvirtuallab/maml/blob/master/maml/apps/pes/_mtp.py
+def read_cfgs_asinput(filename, dictOfSpecies):
+    """
+    Args:
+        filename (str): The configuration file to be read.
+    """
+    with open(filename, "r") as f:
+        # lines = f.readlines() # << it won't work in the `for` loop :/
+        letters = f.read() # 
+    #
+    block_pattern = re.compile("BEGIN_CFG\n(.*?)\nEND_CFG", re.S)
+    
+    data_pool = []
+    for block in block_pattern.findall(letters):
+        d = {}
+        d["size"] = getSize(block)
+        d["cell"] = getCell(block)
+        species, positions = getSpeciesPositions(block, dictOfSpecies)
+        d["species"]   = species
+        d["positions"] = positions
+        assert d["size"] == len(species)
+        #
+        data_pool.append(d)
+    #
+    return data_pool
+#
