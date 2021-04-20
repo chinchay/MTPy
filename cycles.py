@@ -522,8 +522,8 @@ maxNcycles = 15
 checkTrainTime = 30
 
 if not path.exists("notinit.txt"):
-    existsPrevious = initialize()
-    if existsPrevious:
+    if path.exists("previousPot.mtp"):
+        existsPrevious = initialize()
         print("I am going to relax because I found previous trained potential ")
         relaxStep()
         print("finished initialization using previous potential")
