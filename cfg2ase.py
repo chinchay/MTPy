@@ -1,3 +1,13 @@
+#***********************************************************************
+#* Program:
+#*    cfg2ase.py
+#* Author:
+#*    Carlos Leon, Wilfrid Laurier University
+#* Summary:
+#*    This is a library to help with the reading of cfg format file (from
+#*    MTP) to ASE atoms object.
+#*************************************************************************/
+
 from ase import Atom
 import numpy as np
 import re

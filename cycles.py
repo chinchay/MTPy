@@ -1,3 +1,13 @@
+#***********************************************************************
+#* Program:
+#*    cycles.py
+#* Author:
+#*    Carlos Leon, Wilfrid Laurier University
+#* Summary:
+#*    The code provide with free user intervention process to deal
+#*    MTP steps.
+#*************************************************************************/
+
 import os
 import time
 import sys
