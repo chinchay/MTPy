@@ -15,6 +15,9 @@ import subprocess
 from subprocess import Popen, PIPE
 import os.path
 from os import path
+
+from cfg2ase import mywrap_C802
+
 # You need `pot_blank_ternary.mtp`, `cycles.py`,  `to_relax.cfg`, `jobtrain.sh`, `train.cfg` (create it by `touch train.cfg` if it's your first cycle)
 # You can run this code with:
 # salloc --time=10:00:00 --ntasks=1 --cpus-per-task=1 --mem-per-cpu=2G --account=def-rmelnik
