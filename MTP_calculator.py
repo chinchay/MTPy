@@ -1,9 +1,16 @@
-# inspired on https://wiki.fysik.dtu.dk/ase/_modules/ase/calculators/lj.html#LennardJones
-import numpy as np
+import importlib
+import utils
 
+# inspired on https://wiki.fysik.dtu.dk/ase/_modules/ase/calculators/lj.html#LennardJones
 from ase.neighborlist import NeighborList
 from ase.calculators.calculator import Calculator, all_changes
 # from ase.stress import full_3x3_to_voigt_6_stress
+
+
+import numpy as np
+from ase import Atoms
+
+importlib.reload(utils)
 
 
 class MTP_calculator(Calculator):
@@ -21,7 +28,8 @@ class MTP_calculator(Calculator):
         filename: string
             File with coefficients/parameters
         """
-        Calculator.__init__(self, filename)
+        Calculator.__init__(self)
+        utils.load(filename="pot.mtp")
     #
 
     def calculate(self, atoms=None, properties=None, system_changes=all_changes):
