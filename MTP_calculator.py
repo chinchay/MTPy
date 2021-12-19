@@ -29,7 +29,8 @@ class MTP_calculator(Calculator):
             File with coefficients/parameters
         """
         Calculator.__init__(self)
-        utils.load(filename="pot.mtp")
+        parameters = utils.load(filename="pot.mtp")
+        
     #
 
     def calculate(self, atoms=None, properties=None, system_changes=all_changes):

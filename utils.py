@@ -6,9 +6,10 @@ def load(filename="pot.mtp"):
     f.close()
 
     assert lines[0] == "MTP", "Can read only MTP format potentials"
-    version            = lines[1].split("=")[1].strip()
     
+    version            = lines[1].split("=")[1].strip()
     assert version == "1.1.0", "MTP file must have version \"1.1.0\""
+    
     pot_desc           = lines[2].split("=")[1].strip()
     scaling            = float(lines[3].split("=")[1])
     species_count      = int(lines[4].split("=")[1])
@@ -127,5 +128,30 @@ def load(filename="pot.mtp"):
     
     linear_mults = np.ones(alpha_scalar_moments)
     max_linear = 1e-10 * np.ones(alpha_scalar_moments)
+
+    toReturn = [pot_desc, scaling, species_count, 
+                rbasis_type, min_dist, max_dist, 
+                rb_size, radial_func_count, regression_coeffs,
+                alpha_moments_count, alpha_index_basic_count, 
+                alpha_index_basic, alpha_index_times, 
+                alpha_scalar_moments, linear_coeffs]
+    #
+    params = { {"pot_desc":pot_desc},
+            {"scaling":scaling},
+            {"species_count":species_count},
+            {"rbasis_type":rbasis_type},
+            {"min_dist":rbasis_type},
+            {"max_dist":rbasis_type},
+            {"rb_size":rbasis_type},
+            {"radial_func_count":rbasis_type},
+            {"regression_coeffs":rbasis_type},
+            {"alpha_moments_count":rbasis_type},
+            {"alpha_index_basic_count":rbasis_type},
+            {"alpha_index_basic":rbasis_type},
+            {"alpha_index_times":rbasis_type},
+            {"alpha_scalar_moments":rbasis_type},
+            {"linear_coeffs":rbasis_type},
+    }
+    return params
 #
 
