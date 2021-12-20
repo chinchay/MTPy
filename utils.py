@@ -1,4 +1,5 @@
 import numpy as np
+from ase import neighborlist
 
 def load(filename="pot.mtp"):
     f = open(filename)
@@ -136,29 +137,31 @@ def load(filename="pot.mtp"):
     #     regression_coeffs.append(e)
     # #
     
-    toReturn = [pot_desc, scaling, species_count, 
-                rbasis_type, min_dist, max_dist, 
-                rb_size, radial_func_count, regression_coeffs,
-                alpha_moments_count, alpha_index_basic_count, 
-                alpha_index_basic, alpha_index_times, 
-                alpha_scalar_moments, linear_coeffs]
+    # toReturn = [pot_desc, scaling, species_count, 
+    #             rbasis_type, min_dist, max_dist, 
+    #             rb_size, radial_func_count, regression_coeffs,
+    #             alpha_moments_count, alpha_index_basic_count, 
+    #             alpha_index_basic, alpha_index_times, 
+    #             alpha_scalar_moments, linear_coeffs]
     #
-    params = { {"pot_desc":pot_desc},
-            {"scaling":scaling},
-            {"species_count":species_count},
-            {"rbasis_type":rbasis_type},
-            {"min_dist":rbasis_type},
-            {"max_dist":rbasis_type},
-            {"rb_size":rbasis_type},
-            {"radial_func_count":rbasis_type},
-            {"regression_coeffs":rbasis_type},
-            {"alpha_moments_count":rbasis_type},
-            {"alpha_index_basic_count":rbasis_type},
-            {"alpha_index_basic":rbasis_type},
-            {"alpha_index_times":rbasis_type},
-            {"alpha_scalar_moments":rbasis_type},
-            {"alpha_count":alpha_count},
-            {"linear_coeffs":rbasis_type},
+    params = { "pot_desc":pot_desc,
+            "scaling":scaling,
+            "species_count":species_count,
+            "rbasis_type":rbasis_type,
+            "min_dist":min_dist,
+            "max_dist":max_dist,
+            "rb_size":rb_size,
+            "radial_func_count":radial_func_count,
+            "regression_coeffs":regression_coeffs,
+            "alpha_moments_count":alpha_moments_count,
+            "alpha_index_basic_count":alpha_index_basic_count,
+            "alpha_index_basic":alpha_index_basic,
+            "alpha_index_times":alpha_index_times,
+            "alpha_scalar_moments":alpha_scalar_moments,
+            "alpha_count":alpha_count,
+            "linear_coeffs":linear_coeffs,
+            "alpha_index_times_count":alpha_index_times_count,
+            "alpha_moment_mapping":alpha_moment_mapping,
     }
     return params
 #
@@ -176,23 +179,40 @@ def init_vecs(parameters):
     
     max_alpha_index_basic = np.max(parameters["alpha_index_basic"]) + 1
     inv_dist_powers_ = np.zeros(max_alpha_index_basic)
-    coords_powers_ = np.zeros(max_alpha_index_basic, 3)
+    coords_powers_ = np.zeros( (max_alpha_index_basic, 3) )
 
     linear_mults = np.ones(parameters["alpha_scalar_moments"])
     max_linear = 1e-10 * np.ones(parameters["alpha_scalar_moments"])
-    
-    return max_dist, min_dist, mult, rb_vals, rb_ders, moment_vals,  basis_vals, site_energy_ders_wrt_moments_, max_alpha_index_basic, inv_dist_powers_, coords_powers_, linear_mults, max_linear
+
+    initializedVecs = {
+                "max_dist":max_dist,
+                "min_dist":mult, 
+                "rb_vals":rb_vals,
+                "rb_ders":rb_ders,
+                "moment_vals":moment_vals,
+                "basis_vals":basis_vals, 
+                "site_energy_ders_wrt_moments_":site_energy_ders_wrt_moments_, 
+                "max_alpha_index_basic":max_alpha_index_basic,
+                "inv_dist_powers_":inv_dist_powers_, 
+                "coords_powers_":coords_powers_,
+                "linear_mults":linear_mults,
+                "max_linear":max_linear,
+                "mult":mult,
+                }
+    #
+    return initializedVecs
 #
 
 def belongs(x, xmin, xmax):
     return (xmin <= x) and (x <= xmax)
 #
 
+# rb_vals, rb_ders = rb_Calc(r, min_dist, max_dist, mult, rb_vals, rb_ders, scaling, rb_size)
 def rb_Calc(r, min_dist, max_dist, mult, rb_vals, rb_ders, scaling, rb_size):
     # from src/radial_basis.cpp: void RadialBasis_Chebyshev::RB_Calc(double r)
     
     # if parameters["rbasis_type"] == "RBChebyshev":
-    assert belongs(r, min_dist, max_dist), "r does not belong to [min_dist, max_dist]"
+    assert belongs(r, min_dist, max_dist), "r does not belong to [min_dist, max_dist]: " + str(r) + " min_dist=" +str(min_dist) + " max_dist=" + str(max_dist)
 
     ksi = ( (2 * r) - (min_dist + max_dist)) / (max_dist - min_dist)
     R = r - max_dist
@@ -225,19 +245,46 @@ def _pows(r, inv_dist_powers_, coords_powers_, max_alpha_index_basic, NeighbVect
             coords_powers_[k][a] = coords_powers_[k - 1][a] * NeighbVect_j[a]
     #    
     return inv_dist_powers_, coords_powers_
+#
 
-
-def calcSiteEnergyDers( nbh, type_central, # type of central atom at `i`
-                        linear_coeffs, lenNbh, 
-                        alpha_index_basic, alpha_index_basic_count, 
+# buff_site_energy_ = calcSiteEnergyDers( nbh, type_central, # type of central atom at `i`
+#                         linear_coeffs, lenNbh, 
+#                         alpha_index_basic, alpha_index_basic_count, 
+#                         max_alpha_index_basic,
+#                         alpha_index_times, alpha_index_times_count,
+#                         alpha_scalar_moments, alpha_moment_mapping,
+#                         regression_coeffs, moment_vals,
+#                         inv_dist_powers_, coords_powers_,
+#                         species_count, radial_func_count, rb_size,
+#                         min_dist, max_dist, mult, rb_vals, rb_ders, scaling,
+#                         linear_mults, max_linear
+#                         )
+def calcSiteEnergyDers( nbh,
+                        type_central, # type of central atom at `i`
+                        linear_coeffs,
+                        lenNbh, 
+                        alpha_index_basic,
+                        alpha_index_basic_count, 
                         max_alpha_index_basic,
-                        alpha_index_times, alpha_index_times_count,
-                        alpha_scalar_moments, alpha_moment_mapping,
-                        regression_coeffs, moment_vals,
-                        inv_dist_powers_, coords_powers_,
-                        types, species_count, radial_func_count, rb_size,
-                        min_dist, max_dist, mult, rb_vals, rb_ders, scaling,
-                        linear_mults, max_linear
+                        alpha_index_times,
+                        alpha_index_times_count,
+                        alpha_scalar_moments,
+                        alpha_moment_mapping,
+                        regression_coeffs,
+                        moment_vals,
+                        inv_dist_powers_,
+                        coords_powers_,
+                        species_count,
+                        radial_func_count,
+                        rb_size,
+                        min_dist,
+                        max_dist,
+                        mult,
+                        rb_vals,
+                        rb_ders,
+                        scaling,
+                        linear_mults,
+                        max_linear
                         ):
     #
     # from dev_src/mtpr.cpp: void MLMTPR::CalcSiteEnergyDers(const Neighborhood& nbh)
@@ -250,21 +297,22 @@ def calcSiteEnergyDers( nbh, type_central, # type of central atom at `i`
     # dicTypes = {"C":0, "O": 1}
     # types = [0,0,0,0, 1,1] #just an example
 
-    C = species_count   		#number of different species in current potential
-    K = radial_func_count		#number of radial functions in current potential
-    R = rb_size                 #number of Chebyshev polynomials constituting one radial function
+    # C = species_count   		#number of different species in current potential
+    # K = radial_func_count		#number of radial functions in current potential
+    # R = rb_size                 #number of Chebyshev polynomials constituting one radial function
 
-    moment_jacobian_ = np.zeros((alpha_index_basic_count, lenNbh, 3))
+    # moment_jacobian_ = np.zeros((alpha_index_basic_count, lenNbh, 3))
 
     assert type_central < species_count, "Too few species count in the MTP potential!"
 
     for j in range(lenNbh):
-        NeighbVect_j = nbh.vecs[j] #<<<<<<
-        r = nbh.dists[j]  #<<<<<<
+        # NeighbVect_j = nbh.vecs[j] #<<<<<<
+        # r = nbh.dists[j]  #<<<<<<
 
-        rb_vals, rb_ders = rb_Calc(r, min_dist, max_dist,
-                                    mult, rb_vals, rb_ders, 
-                                    rb_ders, scaling, rb_size)
+        NeighbVect_j = nbh[j]["D"]
+        r = nbh[j]["d"]
+
+        rb_vals, rb_ders = rb_Calc(r, min_dist, max_dist, mult, rb_vals, rb_ders, scaling, rb_size)
         #
 
         rb_vals *= scaling # rb_vals is numpy array, so we can directly multyply by a float if array is float
@@ -272,7 +320,8 @@ def calcSiteEnergyDers( nbh, type_central, # type of central atom at `i`
 
         inv_dist_powers_, coords_powers_ = _pows(r, inv_dist_powers_, coords_powers_, max_alpha_index_basic, NeighbVect_j)
 
-        type_outer = nbh.types[j] #<<<<<<
+        # type_outer = nbh.types[j] #<<<<<<
+        type_outer = nbh[j]["type"]
 
         for i in range(alpha_index_basic_count):
             val = 0.0
@@ -366,11 +415,70 @@ def calcSiteEnergyDers( nbh, type_central, # type of central atom at `i`
     return buff_site_energy_
 #
 
-def CalcEFS(atoms):
+def CalcEFS(atoms, neighborhoods, type_centrals, params, vecs):
+    # from src/basic_mlip.cpp:  void AnyLocalMLIP::CalcEFS(Configuration& cfg)
     energy = 0.0
-    for i in range(nAtoms):
-        nbh = neighborhood(atoms[i])
-        energy += calcSiteEnergyDers(nbh, type_central)
+    for i in range(len(atoms)):
+        nbh = neighborhoods[i]
+        lenNbh = len(nbh)
+        type_central = type_centrals[i]
+
+        # energy += calcSiteEnergyDers(nbh, type_central)
+        # 
+        energy += calcSiteEnergyDers(   nbh,
+                                        type_central, # type of central atom at `i`
+                                        params["linear_coeffs"],
+                                        lenNbh,
+                                        params["alpha_index_basic"],
+                                        params["alpha_index_basic_count"],
+                                        vecs["max_alpha_index_basic"],
+                                        params["alpha_index_times"],
+                                        params["alpha_index_times_count"],
+                                        params["alpha_scalar_moments"],
+                                        params["alpha_moment_mapping"],
+                                        params["regression_coeffs"],
+                                        vecs["moment_vals"],
+                                        vecs["inv_dist_powers_"],
+                                        vecs["coords_powers_"],
+                                        params["species_count"],
+                                        params["radial_func_count"],
+                                        params["rb_size"],
+                                        params["min_dist"],
+                                        params["max_dist"],
+                                        vecs["mult"],
+                                        vecs["rb_vals"],
+                                        vecs["rb_ders"],
+                                        params["scaling"],
+                                        vecs["linear_mults"],
+                                        vecs["max_linear"]
+                                    )        
+        #
     #
     return energy
+#
+
+
+# neighborhoods = get_neighborhoods(atoms, cutOff)
+def get_neighborhoods(atoms, listCutOffs, dictionaryTypes):
+    neighborList = neighborlist.NeighborList(listCutOffs, self_interaction=False, bothways=True)
+    neighborList.update(atoms)
+    li, lj, ld, lD = neighborlist.neighbor_list('ijdD', atoms, listCutOffs)
+
+    neighborhoods = {i:[] for i in range(len(atoms))}
+    for k in range(len(li)):
+        i = li[k]
+        j = lj[k]
+        d = ld[k]
+        D = lD[k]
+        t = dictionaryTypes[ atoms[j].symbol ]
+        neighborhoods[i].append( { "j":j, "d":d, "D":D, "type":t } )
+    #
+    return neighborhoods
+#
+
+# type_centrals = get_type_centrals(atoms, dictionaryTypes)
+def get_type_centrals(atoms, dictionaryTypes):
+    # dictionaryTypes = { "C":0, "O":1 }
+    type_centrals = [dictionaryTypes[i] for i in atoms.get_chemical_symbols()]
+    return type_centrals
 #
