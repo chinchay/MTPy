@@ -21,7 +21,7 @@ class MTP_calculator(Calculator):
     # implemented_properties = ['energy', 'energies', 'forces', 'free_energy']
     # implemented_properties += ['stress', 'stresses']  # bulk properties
 
-    def __init__(self, filename):
+    def __init__(self, filename, dictionaryTypes):
         """
         Parameters
         ----------
@@ -29,16 +29,37 @@ class MTP_calculator(Calculator):
             File with coefficients/parameters
         """
         Calculator.__init__(self)
-        parameters = utils.load(filename="pot.mtp")
-        
+        self.parameters = utils.load(filename="pot.mtp")
+        self.initializePotential(self.parameters)
+
+        self.dictionaryTypes = dictionaryTypes
     #
 
-    def calculate(self, atoms=None, properties=None, system_changes=all_changes):
+    def initializePotential(self, parameters):
+        self.initializedVecs = utils.init_vecs(parameters)
+        # self.atoms = atoms # << it says `atoms` is not initialized here :/
+    #
+     
+    def calculate(self, atoms, properties=None, system_changes=all_changes):
         # if properties is None:
         #     properties = self.implemented_properties
         # #
         # Calculator.calculate(self, atoms, properties, system_changes)
 
-        self.results['energy'] = 101.0
+        # energy = utils.CalcEFS()
+
+        # self.atoms = atoms # the structure `atoms` to wich this calculator is attached
+        # print(self.atoms)
+
+        self.atoms = atoms # the structure `atoms` to wich this calculator is attached 
+        self.list_max_dist = 0.5 * self.parameters["max_dist"] * np.ones(len(atoms))
+        neighborhoods = utils.get_neighborhoods(atoms, self.list_max_dist, self.dictionaryTypes)
+        type_centrals = utils.get_type_centrals(atoms, self.dictionaryTypes)
+        energy = utils.CalcEFS(self.atoms, neighborhoods, type_centrals, self.parameters, self.initializedVecs)
+
+
+
+        
+        self.results['energy'] = energy
     #
 #
