@@ -207,11 +207,11 @@ def read_cfgs_general(filename, dictOfSpecies):
 #%%
 from ase import Atoms, Atom
 
-def dict2atoms(dictCfg):
+def dict2atoms(dictCfg, pbc):
     species = dictCfg['species']
     cell = dictCfg['cell']
     positions = dictCfg['positions']
-    atoms = Atoms("".join(species), cell=cell, positions=positions, pbc=(1,0,1))
+    atoms = Atoms("".join(species), cell=cell, positions=positions, pbc=pbc)
     return atoms
 #
 

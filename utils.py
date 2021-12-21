@@ -292,6 +292,9 @@ def calcSiteEnergyDers( nbh,
 
     buff_site_energy_ = 0.0
 
+    # initialize
+    moment_vals *= 0.0
+
     # lenNbh = len(nbh)
 
     # dicTypes = {"C":0, "O": 1}
@@ -395,21 +398,21 @@ def calcSiteEnergyDers( nbh,
 	#
 
     # renewing maximum absolute values
-    for i in range(alpha_scalar_moments):
+    # for i in range(alpha_scalar_moments):
         # max_linear[i] = max(
         #     max_linear[i],
         #     abs(linear_coeffs[species_count + i] * moment_vals[alpha_moment_mapping[i]])
         #     )
         # #
+    #
 
-        # convolving with coefficients
-        buff_site_energy_ += linear_coeffs[type_central]
+    # convolving with coefficients
+    buff_site_energy_ += linear_coeffs[type_central]
 
-        for i in range(alpha_scalar_moments):
-            # buff_site_energy_ += linear_coeffs[species_count + i] * linear_mults[i] * moment_vals[alpha_moment_mapping[i]]
-            # I simplified because linear_mults[i] = 1
-            buff_site_energy_ += linear_coeffs[species_count + i] * moment_vals[alpha_moment_mapping[i]]
-        #
+    for i in range(alpha_scalar_moments):
+        # buff_site_energy_ += linear_coeffs[species_count + i] * linear_mults[i] * moment_vals[alpha_moment_mapping[i]]
+        # I simplified because linear_mults[i] = 1
+        buff_site_energy_ += linear_coeffs[species_count + i] * moment_vals[alpha_moment_mapping[i]]
     #
 
     return buff_site_energy_
@@ -453,6 +456,7 @@ def CalcEFS(atoms, neighborhoods, type_centrals, params, vecs):
                                         vecs["max_linear"]
                                     )        
         #
+        # print(energy)
     #
     return energy
 #

@@ -29,17 +29,11 @@ class MTP_calculator(Calculator):
             File with coefficients/parameters
         """
         Calculator.__init__(self)
-        self.parameters = utils.load(filename="pot.mtp")
-        self.initializePotential(self.parameters)
-
+        self.parameters = utils.load(filename)
+        self.initializedVecs = utils.init_vecs(self.parameters)
         self.dictionaryTypes = dictionaryTypes
     #
 
-    def initializePotential(self, parameters):
-        self.initializedVecs = utils.init_vecs(parameters)
-        # self.atoms = atoms # << it says `atoms` is not initialized here :/
-    #
-     
     def calculate(self, atoms, properties=None, system_changes=all_changes):
         # if properties is None:
         #     properties = self.implemented_properties
